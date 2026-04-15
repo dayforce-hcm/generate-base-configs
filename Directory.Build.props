@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <Product>GenerateBaseConfigs</Product>
+    <AssemblyTitle>$(Product)</AssemblyTitle>
+    <Description>Creates and maintains app.base.config files for Dayforce acceptance test projects.</Description>
+    <Team>Release Engineering</Team>
+  </PropertyGroup>
+  <Import Project="$(MSBuildThisFileDirectory)\Directory.Build.Template.props" Condition="'$(TF_BUILD)' != ''"/>
+</Project>
