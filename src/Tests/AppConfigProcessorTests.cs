@@ -146,6 +146,36 @@ public class AppConfigProcessorTests
     }
 
     [Fact]
+    public void StripBinding_ElementAfterRuntime_KeepsItsOwnNewline()
+    {
+        const string xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <configuration>
+              <appSettings />
+              <runtime>
+                <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
+                  <dependentAssembly>
+                    <assemblyIdentity name="Foo" publicKeyToken="AABBCCDD" culture="neutral" />
+                    <bindingRedirect oldVersion="0.0.0.0-1.0.0.0" newVersion="1.0.0.0" />
+                  </dependentAssembly>
+                </assemblyBinding>
+              </runtime>
+              <startup>
+                <supportedRuntime version="v4.0" />
+              </startup>
+            </configuration>
+            """;
+
+        var result = Strip(xml);
+
+        Assert.NotNull(result);
+        // <startup> must not be merged onto the same line as </appSettings>
+        Assert.DoesNotContain("</appSettings><startup>", result!);
+        // <startup> must retain its own line (handles both \r\n and \n line endings)
+        Assert.Contains("\n  <startup>", result!);
+    }
+
+    [Fact]
     public void StripBinding_WithCodeBase_RemovesEntireAssemblyBinding()
     {
         const string xml = """

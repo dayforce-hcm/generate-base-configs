@@ -101,15 +101,12 @@ internal static class AppConfigProcessor
     {
         var parent = node.ParentNode!;
 
-        // Remove preceding whitespace sibling
+        // Remove only the preceding whitespace sibling (the newline/indent that leads into
+        // the removed node). The following whitespace sibling belongs to the next element
+        // and must be kept so that element retains its own line.
         var prev = node.PreviousSibling;
         if (prev is XmlText or XmlWhitespace && string.IsNullOrWhiteSpace(prev.Value))
             parent.RemoveChild(prev);
-
-        // Remove following whitespace sibling
-        var next = node.NextSibling;
-        if (next is XmlText or XmlWhitespace && string.IsNullOrWhiteSpace(next.Value))
-            parent.RemoveChild(next);
 
         parent.RemoveChild(node);
     }
