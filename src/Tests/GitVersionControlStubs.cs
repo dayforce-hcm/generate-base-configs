@@ -1,40 +1,51 @@
 using System;
+using System.Collections.Generic;
 using GenerateBaseConfigs;
 
 namespace Tests;
 
-/// <summary>
-/// Stub that reports no files as git-tracked. Use in tests to avoid touching a real git repo.
-/// </summary>
-internal sealed class NoGitVersionControl : IGitVersionControl
+internal abstract class DummyGitVersionControl<T> : IGitVersionControl
+    where T : DummyGitVersionControl<T>, new()
 {
-    internal static readonly NoGitVersionControl Instance = new();
+    internal static readonly T Instance = new();
 
-    public bool IsTracked(string filePath) => false;
-    public void UntrackFile(string filePath) { }
-
-    /// <summary>Scope that replaces AppConfigProcessor.GitVersionControl for the duration of the test.</summary>
     internal readonly struct Scope : IDisposable
     {
-        private readonly IGitVersionControl _previous;
+        private readonly IGitVersionControl m_prevInstance;
 
-        internal Scope(IGitVersionControl stub)
+        public Scope()
         {
-            _previous = AppConfigProcessor.GitVersionControl;
-            AppConfigProcessor.GitVersionControl = stub;
+            m_prevInstance = AppConfigProcessor.GitVersionControl;
+            AppConfigProcessor.GitVersionControl = Instance;
         }
 
-        public void Dispose() => AppConfigProcessor.GitVersionControl = _previous;
+        public readonly void Dispose() => AppConfigProcessor.GitVersionControl = m_prevInstance;
     }
+
+    public string? WorkspaceRoot { get; set; }
+    public string? HEAD => null;
+    public abstract bool IsTracked(string filePath);
+    public abstract void UntrackFile(string filePath);
 }
 
-/// <summary>
-/// Stub that reports every file as git-tracked and records untrack calls.
-/// </summary>
-internal sealed class TrackingGitVersionControl : IGitVersionControl
+internal class NoGitVersionControl : DummyGitVersionControl<NoGitVersionControl>
 {
-    internal readonly System.Collections.Generic.List<string> UntrackedFiles = [];
+    public override bool IsTracked(string filePath) => false;
+    public override void UntrackFile(string filePath) { }
+}
 
+internal class ForceGitVersionControl : DummyGitVersionControl<ForceGitVersionControl>
+{
+    public override bool IsTracked(string filePath) => true;
+    public override void UntrackFile(string filePath) { }
+}
+
+internal class TrackingGitVersionControl : IGitVersionControl
+{
+    internal readonly List<string> UntrackedFiles = [];
+
+    public string? WorkspaceRoot { get; set; }
+    public string? HEAD => null;
     public bool IsTracked(string filePath) => true;
     public void UntrackFile(string filePath) => UntrackedFiles.Add(filePath);
 }

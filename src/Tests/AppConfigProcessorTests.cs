@@ -210,7 +210,7 @@ public class AppConfigProcessorTests
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
         var baseConfig = tmp.Path("app.base.config");
 
-        using var _ = new NoGitVersionControl.Scope(NoGitVersionControl.Instance);
+        using var _ = new NoGitVersionControl.Scope();
         AppConfigProcessor.RunModeA(appConfig, baseConfig, dryRun: false, verbose: false);
 
         Assert.True(File.Exists(baseConfig));
@@ -225,7 +225,7 @@ public class AppConfigProcessorTests
         using var tmp = new TempDir();
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
 
-        using var _ = new NoGitVersionControl.Scope(NoGitVersionControl.Instance);
+        using var _ = new NoGitVersionControl.Scope();
         AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: false, verbose: false);
 
         var gitIgnore = tmp.Path(".gitignore");
@@ -240,7 +240,7 @@ public class AppConfigProcessorTests
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
         tmp.WriteFile(".gitignore", "app.config\r\n");
 
-        using var _ = new NoGitVersionControl.Scope(NoGitVersionControl.Instance);
+        using var _ = new NoGitVersionControl.Scope();
         AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: false, verbose: false);
 
         var lines = File.ReadAllLines(tmp.Path(".gitignore"));
@@ -253,7 +253,7 @@ public class AppConfigProcessorTests
         using var tmp = new TempDir();
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
 
-        using var _ = new NoGitVersionControl.Scope(NoGitVersionControl.Instance);
+        using var _ = new NoGitVersionControl.Scope();
         AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: true, verbose: false);
 
         Assert.False(File.Exists(tmp.Path("app.base.config")));
@@ -266,9 +266,16 @@ public class AppConfigProcessorTests
         using var tmp = new TempDir();
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
         var trackingGit = new TrackingGitVersionControl();
-
-        using var _ = new NoGitVersionControl.Scope(trackingGit);
-        AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: false, verbose: false);
+        var prev = AppConfigProcessor.GitVersionControl;
+        AppConfigProcessor.GitVersionControl = trackingGit;
+        try
+        {
+            AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: false, verbose: false);
+        }
+        finally
+        {
+            AppConfigProcessor.GitVersionControl = prev;
+        }
 
         Assert.Contains(appConfig, trackingGit.UntrackedFiles);
     }
@@ -299,18 +306,36 @@ public class AppConfigProcessorTests
     }
 
     [Fact]
-    public void ModeB_SkipsCopy_WhenAppConfigAlreadyExists()
+    public void ModeB_SkipsCopy_WhenAppConfigNewerThanBaseConfig()
     {
-        // app.config already exists (e.g. second build) — Mode B must not overwrite it.
-        // GenerateBindingRedirects only writes when content changes, so touching the file
-        // here would force a recompile of the project and all its dependents on every build.
+        // Second build: app.config is newer (GenerateBindingRedirects wrote it) —
+        // touching it again would force a recompile of the project and all its dependents.
         using var tmp = new TempDir();
         var baseConfig = tmp.WriteFile("app.base.config", SampleAppConfigNoBindings);
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
+        var t = DateTime.UtcNow;
+        File.SetLastWriteTimeUtc(baseConfig, t);
+        File.SetLastWriteTimeUtc(appConfig, t.AddSeconds(1)); // app.config is newer
 
         AppConfigProcessor.RunModeB(appConfig, baseConfig, dryRun: false, verbose: false);
 
         Assert.Equal(SampleAppConfigWithBindings, File.ReadAllText(appConfig));
+    }
+
+    [Fact]
+    public void ModeB_CopiesBaseConfig_WhenBaseConfigNewerThanAppConfig()
+    {
+        // app.base.config was modified after the last build — Mode B must refresh app.config.
+        using var tmp = new TempDir();
+        var baseConfig = tmp.WriteFile("app.base.config", SampleAppConfigNoBindings);
+        var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
+        var t = DateTime.UtcNow;
+        File.SetLastWriteTimeUtc(appConfig, t);
+        File.SetLastWriteTimeUtc(baseConfig, t.AddSeconds(1)); // base is newer
+
+        AppConfigProcessor.RunModeB(appConfig, baseConfig, dryRun: false, verbose: false);
+
+        Assert.Equal(SampleAppConfigNoBindings, File.ReadAllText(appConfig));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
