@@ -25,7 +25,7 @@ The tool selects its behaviour automatically based on whether `app.base.config` 
 | State | What the tool does |
 |---|---|
 | `app.base.config` **does not exist** (first run / migration) | Reads `app.config`, strips `<assemblyBinding>`, writes `app.base.config`, adds `app.config` to `.gitignore`, removes `app.config` from the git index |
-| `app.base.config` **exists** (every subsequent build) | Copies `app.base.config` → `app.config` so `GenerateBindingRedirects` has a clean base to inject into |
+| `app.base.config` **exists** (every subsequent build) | Copies `app.base.config` → `app.config` if `app.config` is absent or older than `app.base.config`; skips the copy otherwise to avoid touching the file timestamp unnecessarily |
 
 ## Build & test
 
@@ -124,7 +124,7 @@ git commit -m "migration: introduce app.base.config for AT projects; remove app.
 
 Build one of the migrated projects and confirm:
 
-1. `RestoreBaseConfig` runs and logs `Mode B — restoring app.config from app.base.config`
+1. `RestoreBaseConfig` runs and logs `Mode B — restoring app.config from app.base.config` (first build) or `Mode B — app.config is up-to-date, skipping copy` (subsequent builds)
 2. `WriteBindingRedirects` runs immediately after and injects binding redirects into the restored `app.config`
 3. The final `app.config` in the output directory contains both your settings and the current binding redirects
 4. `git status` shows no changes to `app.config` after the build
