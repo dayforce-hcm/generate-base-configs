@@ -5,13 +5,26 @@ namespace GenerateBaseConfigs;
 
 internal interface IGitVersionControl
 {
+    string? WorkspaceRoot { get; set; }
     bool IsTracked(string filePath);
+    string? HEAD { get; }
     void UntrackFile(string filePath);
 }
 
 internal class GitVersionControl : IGitVersionControl
 {
     internal static IGitVersionControl Instance = new GitVersionControl();
+
+    public string? WorkspaceRoot { get; set; }
+
+    public string? HEAD
+    {
+        get
+        {
+            using var repo = new Repository(WorkspaceRoot);
+            return repo.Head.Tip.Sha;
+        }
+    }
 
     /// <summary>
     /// Returns true if the file is tracked by git (in the index or HEAD).

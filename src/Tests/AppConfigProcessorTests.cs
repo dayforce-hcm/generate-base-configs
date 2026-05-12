@@ -210,7 +210,7 @@ public class AppConfigProcessorTests
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
         var baseConfig = tmp.Path("app.base.config");
 
-        using var _ = new NoGitVersionControl.Scope(NoGitVersionControl.Instance);
+        using var _ = new NoGitVersionControl.Scope();
         AppConfigProcessor.RunModeA(appConfig, baseConfig, dryRun: false, verbose: false);
 
         Assert.True(File.Exists(baseConfig));
@@ -225,7 +225,7 @@ public class AppConfigProcessorTests
         using var tmp = new TempDir();
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
 
-        using var _ = new NoGitVersionControl.Scope(NoGitVersionControl.Instance);
+        using var _ = new NoGitVersionControl.Scope();
         AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: false, verbose: false);
 
         var gitIgnore = tmp.Path(".gitignore");
@@ -240,7 +240,7 @@ public class AppConfigProcessorTests
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
         tmp.WriteFile(".gitignore", "app.config\r\n");
 
-        using var _ = new NoGitVersionControl.Scope(NoGitVersionControl.Instance);
+        using var _ = new NoGitVersionControl.Scope();
         AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: false, verbose: false);
 
         var lines = File.ReadAllLines(tmp.Path(".gitignore"));
@@ -253,7 +253,7 @@ public class AppConfigProcessorTests
         using var tmp = new TempDir();
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
 
-        using var _ = new NoGitVersionControl.Scope(NoGitVersionControl.Instance);
+        using var _ = new NoGitVersionControl.Scope();
         AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: true, verbose: false);
 
         Assert.False(File.Exists(tmp.Path("app.base.config")));
@@ -266,9 +266,16 @@ public class AppConfigProcessorTests
         using var tmp = new TempDir();
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
         var trackingGit = new TrackingGitVersionControl();
-
-        using var _ = new NoGitVersionControl.Scope(trackingGit);
-        AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: false, verbose: false);
+        var prev = AppConfigProcessor.GitVersionControl;
+        AppConfigProcessor.GitVersionControl = trackingGit;
+        try
+        {
+            AppConfigProcessor.RunModeA(appConfig, tmp.Path("app.base.config"), dryRun: false, verbose: false);
+        }
+        finally
+        {
+            AppConfigProcessor.GitVersionControl = prev;
+        }
 
         Assert.Contains(appConfig, trackingGit.UntrackedFiles);
     }
