@@ -299,18 +299,36 @@ public class AppConfigProcessorTests
     }
 
     [Fact]
-    public void ModeB_SkipsCopy_WhenAppConfigAlreadyExists()
+    public void ModeB_SkipsCopy_WhenAppConfigNewerThanBaseConfig()
     {
-        // app.config already exists (e.g. second build) — Mode B must not overwrite it.
-        // GenerateBindingRedirects only writes when content changes, so touching the file
-        // here would force a recompile of the project and all its dependents on every build.
+        // Second build: app.config is newer (GenerateBindingRedirects wrote it) —
+        // touching it again would force a recompile of the project and all its dependents.
         using var tmp = new TempDir();
         var baseConfig = tmp.WriteFile("app.base.config", SampleAppConfigNoBindings);
         var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
+        var t = DateTime.UtcNow;
+        File.SetLastWriteTimeUtc(baseConfig, t);
+        File.SetLastWriteTimeUtc(appConfig, t.AddSeconds(1)); // app.config is newer
 
         AppConfigProcessor.RunModeB(appConfig, baseConfig, dryRun: false, verbose: false);
 
         Assert.Equal(SampleAppConfigWithBindings, File.ReadAllText(appConfig));
+    }
+
+    [Fact]
+    public void ModeB_CopiesBaseConfig_WhenBaseConfigNewerThanAppConfig()
+    {
+        // app.base.config was modified after the last build — Mode B must refresh app.config.
+        using var tmp = new TempDir();
+        var baseConfig = tmp.WriteFile("app.base.config", SampleAppConfigNoBindings);
+        var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
+        var t = DateTime.UtcNow;
+        File.SetLastWriteTimeUtc(appConfig, t);
+        File.SetLastWriteTimeUtc(baseConfig, t.AddSeconds(1)); // base is newer
+
+        AppConfigProcessor.RunModeB(appConfig, baseConfig, dryRun: false, verbose: false);
+
+        Assert.Equal(SampleAppConfigNoBindings, File.ReadAllText(appConfig));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
