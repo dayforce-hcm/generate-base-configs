@@ -52,15 +52,25 @@ internal static class AppConfigProcessor
 
     /// <summary>
     /// Mode B: app.base.config exists.
-    /// Copies app.base.config to app.config so GenerateBindingRedirects gets a clean base.
+    /// Copies app.base.config to app.config only when app.config does not exist (e.g. fresh clone).
+    /// Skips the copy on subsequent builds so the file timestamp is not touched unnecessarily —
+    /// an unnecessary write would force recompilation of the project and all its dependents.
+    /// GenerateBindingRedirects updates the existing app.config in-place when redirects change.
     /// </summary>
     internal static void RunModeB(string appConfigPath, string baseConfigPath, bool dryRun, bool verbose)
     {
+        if (File.Exists(appConfigPath))
+        {
+            if (verbose)
+                Console.WriteLine($"GenerateBaseConfigs: Mode B — {appConfigPath} already exists, skipping copy");
+            return;
+        }
+
         if (verbose)
             Console.WriteLine($"GenerateBaseConfigs: Mode B — restoring {appConfigPath} from {baseConfigPath}");
 
         if (!dryRun)
-            File.Copy(baseConfigPath, appConfigPath, overwrite: true);
+            File.Copy(baseConfigPath, appConfigPath, overwrite: false);
     }
 
     /// <summary>

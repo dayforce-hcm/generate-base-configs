@@ -287,18 +287,6 @@ public class AppConfigProcessorTests
     }
 
     [Fact]
-    public void ModeB_OverwritesExistingAppConfig()
-    {
-        using var tmp = new TempDir();
-        var baseConfig = tmp.WriteFile("app.base.config", SampleAppConfigNoBindings);
-        var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
-
-        AppConfigProcessor.RunModeB(appConfig, baseConfig, dryRun: false, verbose: false);
-
-        Assert.Equal(File.ReadAllText(baseConfig), File.ReadAllText(appConfig));
-    }
-
-    [Fact]
     public void ModeB_DryRunMakesNoWrites()
     {
         using var tmp = new TempDir();
@@ -308,6 +296,21 @@ public class AppConfigProcessorTests
         AppConfigProcessor.RunModeB(appConfig, baseConfig, dryRun: true, verbose: false);
 
         Assert.False(File.Exists(appConfig));
+    }
+
+    [Fact]
+    public void ModeB_SkipsCopy_WhenAppConfigAlreadyExists()
+    {
+        // app.config already exists (e.g. second build) — Mode B must not overwrite it.
+        // GenerateBindingRedirects only writes when content changes, so touching the file
+        // here would force a recompile of the project and all its dependents on every build.
+        using var tmp = new TempDir();
+        var baseConfig = tmp.WriteFile("app.base.config", SampleAppConfigNoBindings);
+        var appConfig = tmp.WriteFile("app.config", SampleAppConfigWithBindings);
+
+        AppConfigProcessor.RunModeB(appConfig, baseConfig, dryRun: false, verbose: false);
+
+        Assert.Equal(SampleAppConfigWithBindings, File.ReadAllText(appConfig));
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
