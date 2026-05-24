@@ -1,0 +1,57 @@
+# NuGet-DontNet-Tool application
+
+trigger:
+- master
+- hotfix/*
+
+variables:
+  binDir: bin\Release\net9.0
+
+name: 1.0.$(Date:yy)$(DayOfYear)$(Rev:.r)
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: DFDevOps\cicd-templates
+    ref: refs/tags/stable-2
+    # https://dev.azure.com/Ceridian/DFDevOps/_git/cicd-templates
+
+jobs:
+- job: Build
+  pool:
+    demands: DotNetFramework
+  workspace:
+    clean: all
+  variables:
+  - template: ci/variables.yml@templates
+
+  steps:
+  - checkout: self
+    clean: true
+    lfs: false
+    displayName: Checkout ${{ variables['Build.Repository.Name'] }}
+
+  - template: ci/build-and-test.yml@templates
+    parameters:
+      checkout: false
+      dotNetCoreVersion: 9.x
+
+  - template: ci/publish-build-artifacts.yml@templates
+
+  - template: ci/symbols-publish.yml@templates
+
+  - template: ci/nuget-pack-as-tool.yml@templates
+    parameters:
+      id: GenerateBaseConfigs
+      projectDir: src\GenerateBaseConfigs
+      binDir: $(binDir)
+      buildDir: src\GenerateBaseConfigs\build
+
+  - template: ci/nuget-pack-push-promote.yml@templates
+    parameters:
+      packagesToPack: GenerateBaseConfigs.sln
+
+  - template: ci/label-code.yml@templates
+
+  - template: ci/sonar-qube-publish.yml@templates
