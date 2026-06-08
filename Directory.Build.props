@@ -5,5 +5,37 @@
     <Description>Creates and maintains app.base.config files for Dayforce acceptance test projects.</Description>
     <Team>Release Engineering</Team>
   </PropertyGroup>
+
+  <!-- Version: bump GenerateBaseConfigsVersion before pushing a rel/x.y.z branch -->
+  <PropertyGroup>
+    <GenerateBaseConfigsVersion>1.0.0</GenerateBaseConfigsVersion>
+    <IsReleaseBranch>false</IsReleaseBranch>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ReleaseBranchRegex>^rel/(\d+\.\d+\.\d+)$</ReleaseBranchRegex>
+    <IsReleaseBranch Condition="'$(GITHUB_EVENT_NAME)' == 'push' AND '$(GITHUB_REF_NAME)' != ''">$([System.Text.RegularExpressions.Regex]::IsMatch('$(GITHUB_REF_NAME)', '$(ReleaseBranchRegex)'))</IsReleaseBranch>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <VersionPrefix>$(GenerateBaseConfigsVersion)</VersionPrefix>
+    <!-- alpha on all pushes; pr on pull_request; empty on rel/ branch push -->
+    <VersionSuffix Condition="'$(GITHUB_EVENT_NAME)' == 'push' AND '$(IsReleaseBranch)' != 'true'">alpha</VersionSuffix>
+    <VersionSuffix Condition="'$(GITHUB_EVENT_NAME)' == 'pull_request'">pr</VersionSuffix>
+  </PropertyGroup>
+
+  <!-- Place all .nupkg files in artifacts/ at repo root -->
+  <PropertyGroup>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)artifacts/</PackageOutputPath>
+  </PropertyGroup>
+
+  <!-- Deterministic/reproducible builds in CI -->
+  <PropertyGroup>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_RUN_ID)' != ''">true</ContinuousIntegrationBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <RepositoryUrl>https://github.com/dayforce-hcm/generate-base-configs</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
   <Import Project="$(MSBuildThisFileDirectory)\Directory.Build.Template.props" Condition="'$(TF_BUILD)' != ''"/>
 </Project>

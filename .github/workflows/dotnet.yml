@@ -1,0 +1,54 @@
+name: .NET
+
+# Runs on every push and on PRs from forks.
+# Same-repo PRs are skipped on build/pack (the push event already covers them).
+# Publish only fires on rel/x.y.z branch pushes.
+on: [push, pull_request]
+
+jobs:
+
+  build-and-test:
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.user.login != github.repository_owner
+    runs-on: windows-latest
+    steps:
+    - name: Git checkout
+      uses: actions/checkout@v4
+    - name: Build
+      run: dotnet build -c Release
+    - name: Test
+      run: dotnet test -c Release
+
+  pack:
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.user.login != github.repository_owner
+    needs: [build-and-test]
+    runs-on: windows-latest
+    steps:
+    - name: Git checkout
+      uses: actions/checkout@v4
+    - name: Pack
+      run: dotnet pack src/GenerateBaseConfigs/GenerateBaseConfigs.csproj -c Release
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget_packages
+        path: artifacts/*.nupkg
+        if-no-files-found: error
+
+  publish:
+    if: >-
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/heads/rel/')
+    needs: [pack]
+    runs-on: windows-latest
+    steps:
+    - name: Download package artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: nuget_packages
+        path: artifacts
+    - name: Push to NuGet.org
+      run: dotnet nuget push artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}

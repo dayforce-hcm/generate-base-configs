@@ -7,7 +7,7 @@
           Condition="'$(DesignTimeBuild)' != true">
 
     <PropertyGroup>
-      <GenerateBaseConfigsExe Condition="'$(GenerateBaseConfigsExe)' == ''">$(MSBuildThisFileDirectory)..\tools\GenerateBaseConfigs.exe</GenerateBaseConfigsExe>
+      <GenerateBaseConfigsExe Condition="'$(GenerateBaseConfigsExe)' == ''">$(MSBuildThisFileDirectory)..\tools\net9.0\any\GenerateBaseConfigs.exe</GenerateBaseConfigsExe>
     </PropertyGroup>
 
     <Error Condition="!Exists('$(GenerateBaseConfigsExe)')"

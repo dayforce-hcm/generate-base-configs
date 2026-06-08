@@ -3,10 +3,56 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <IsPackable>false</IsPackable>
     <AssemblyName>GenerateBaseConfigs</AssemblyName>
     <Nullable>enable</Nullable>
+
+    <!-- NuGet MSBuild package (not a dotnet tool — consumers use <PackageReference>) -->
+    <PackageId>GenerateBaseConfigs</PackageId>
+    <Authors>Ceridian</Authors>
+    <PackageTags>msbuild;nuget;dayforce;binding-redirects</PackageTags>
+
+    <!-- Suppress SDK default lib/net9.0/ output — this is a tool, not a library reference -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+
+    <!-- Publish directory used by PublishBeforePack and AddPublishOutputToPackage -->
+    <PublishOutputDir>$(MSBuildThisFileDirectory)bin\$(Configuration)\publish\</PublishOutputDir>
+
+    <!-- Hook our custom targets into the pack pipeline -->
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);AddPublishOutputToPackage</TargetsForTfmSpecificContentInPackage>
+
+    <!-- All dependencies are bundled under tools/net9.0/any/ via publish output;
+         listing them as nuspec package references would inject LibGit2Sharp and
+         Mono.Options into consumers' dependency graphs unnecessarily. -->
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
   </PropertyGroup>
+
+  <!-- Include the MSBuild targets file in the package under build/ (auto-imported by NuGet) -->
+  <ItemGroup>
+    <Content Include="build\GenerateBaseConfigs.targets" Pack="true" PackagePath="build\" />
+  </ItemGroup>
+
+  <!-- Publish the exe with all its dependencies before the pack pipeline collects files -->
+  <Target Name="PublishBeforePack" BeforeTargets="GenerateNuspec">
+    <MSBuild Projects="$(MSBuildProjectFullPath)"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);PublishDir=$(PublishOutputDir);SelfContained=false;NoBuild=true" />
+  </Target>
+
+  <!-- Dynamically collect the publish output into TfmSpecificPackageFile items so they land
+       under tools/net9.0/any/ in the nupkg. This target runs after PublishBeforePack because
+       it is in TargetsForTfmSpecificContentInPackage which runs during _WalkEachTargetPerFramework,
+       which is after GenerateNuspec DependsOn chain has run PublishBeforePack. -->
+  <Target Name="AddPublishOutputToPackage">
+    <ItemGroup>
+      <_PublishFiles Include="$(PublishOutputDir)**\*"
+                     Exclude="$(PublishOutputDir)**\*.pdb;$(PublishOutputDir)runtimes\linux-*\**;$(PublishOutputDir)runtimes\osx-*\**" />
+    </ItemGroup>
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(_PublishFiles)">
+        <PackagePath>tools\net9.0\any\%(RecursiveDir)%(Filename)%(Extension)</PackagePath>
+      </TfmSpecificPackageFile>
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="LibGit2Sharp" Version="0.31.0" />
